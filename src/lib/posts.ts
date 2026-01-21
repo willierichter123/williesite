@@ -70,4 +70,3 @@ export function getPostBySlug(slug: string): Post | null {
   const posts = getAllPosts();
   return posts.find((p) => p.slug === slug) ?? null;
 }
-

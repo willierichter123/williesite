@@ -4,9 +4,11 @@ A simple personal site + blog built with **Next.js** and deployed on **Vercel**.
 
 ## Local development
 
-Run the development server:
+Use Node.js `20.x` (the repo includes an `.nvmrc` you can `nvm use`), install dependencies, then run the dev server:
 
 ```bash
+nvm use
+npm install
 npm run dev
 # or
 yarn dev

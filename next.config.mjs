@@ -1,9 +1,13 @@
+const tracedContentGlobs = ["./content/posts/**/*"];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Ensure content files used by fs-based loaders are bundled in serverless builds.
-  // Without this, production can 404 because `content/posts/**` is missing at runtime.
+  // Ensure Markdown/MDX content is packaged with every route that reads from disk.
   outputFileTracingIncludes: {
-    "/*": ["./content/posts/**/*"],
+    "/": tracedContentGlobs,
+    "/blog": tracedContentGlobs,
+    "/blog/[slug]": tracedContentGlobs,
+    "/sitemap": tracedContentGlobs,
   },
 };
 

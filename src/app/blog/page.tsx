@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PostMeta } from "@/components/PostMeta";
 import { getAllPosts } from "@/lib/posts";
 
 export const metadata = {
@@ -28,7 +29,7 @@ export default function BlogIndexPage() {
                   {post.title}
                 </Link>
                 <p className="text-sm text-muted-foreground">{post.description}</p>
-                <p className="text-xs text-muted-foreground">{post.date}</p>
+                <PostMeta date={post.date} tags={post.tags} />
               </li>
             ))}
           </ul>
@@ -37,5 +38,4 @@ export default function BlogIndexPage() {
     </div>
   );
 }
-
 

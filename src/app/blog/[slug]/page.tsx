@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PostMeta } from "@/components/PostMeta";
 import { renderMdx } from "@/lib/mdx";
 import { getAllPosts, getPostBySlug } from "@/lib/posts";
 
@@ -31,7 +32,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           ← Back
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight">{post.title}</h1>
-        <p className="text-sm text-muted-foreground">{post.date}</p>
+        <PostMeta date={post.date} tags={post.tags} className="text-sm" />
         <p className="text-base text-muted-foreground">{post.description}</p>
       </div>
 
@@ -39,5 +40,4 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
     </div>
   );
 }
-
 

@@ -50,20 +50,19 @@ export function getAllPosts(): Post[] {
 
     assertPostFrontmatter(data, fileName);
 
-    const frontmatter: PostFrontmatter = {
+    return {
       title: data.title,
       slug: data.slug,
       date: data.date,
       description: data.description,
       tags: data.tags ?? [],
       published: data.published ?? true,
-    };
-
-    return { ...frontmatter, body: content } satisfies Post;
+      body: content,
+    } satisfies Post;
   });
 
   return posts
-    .filter((p) => p.published !== false)
+    .filter((p) => p.published)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
@@ -71,5 +70,4 @@ export function getPostBySlug(slug: string): Post | null {
   const posts = getAllPosts();
   return posts.find((p) => p.slug === slug) ?? null;
 }
-
 

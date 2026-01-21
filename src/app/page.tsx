@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PostMeta } from "@/components/PostMeta";
 import { getAllPosts } from "@/lib/posts";
 
 export default function Home() {
@@ -37,7 +38,7 @@ export default function Home() {
                   {post.title}
                 </Link>
                 <p className="text-sm text-muted-foreground">{post.description}</p>
-                <p className="text-xs text-muted-foreground">{post.date}</p>
+                <PostMeta date={post.date} tags={post.tags} showTags={false} />
               </li>
             ))}
           </ul>

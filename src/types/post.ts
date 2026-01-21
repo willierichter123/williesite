@@ -7,8 +7,9 @@ export type PostFrontmatter = {
   published?: boolean;
 };
 
-export type Post = PostFrontmatter & {
+export type Post = Omit<PostFrontmatter, "tags" | "published"> & {
+  tags: string[];
+  published: boolean;
   body: string;
 };
-
 

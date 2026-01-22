@@ -10,9 +10,7 @@ export default function Home() {
     <div className="mx-auto max-w-2xl px-6 py-16">
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold tracking-tight">Willie Richter</h1>
-        <p className="text-muted-foreground">
-          A simple personal site for writing. New posts land here as Markdown/MDX files.
-        </p>
+        <p className="text-muted-foreground">A place to capture ideas and progress.</p>
         <div className="flex gap-4 text-sm">
           <Link className="underline underline-offset-4" href="/blog">
             Read the blog

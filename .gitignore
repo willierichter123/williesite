@@ -24,7 +24,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-payments_briefing_cron.log
 
 # local env files
 .env*.local

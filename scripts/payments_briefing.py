@@ -9,10 +9,13 @@ from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 import html
 from html.parser import HTMLParser
+import json
+import os
 import sys
 import textwrap
 from pathlib import Path
 from typing import Iterable, List, Optional
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
@@ -25,6 +28,7 @@ except ImportError:  # pragma: no cover
 DEFAULT_FEED_URL = "https://www.paymentsdive.com/feeds/news/"
 DEFAULT_OUTPUT_DIR = Path("content/posts")
 DEFAULT_TZ = "America/New_York"
+DEFAULT_OPENAI_ENDPOINT = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
 
 
 class _HTMLStripper(HTMLParser):
@@ -177,6 +181,90 @@ def filter_recent(articles: Iterable[Article], now: datetime, hours: int) -> Lis
     return [article for article in articles if article.published >= cutoff]
 
 
+def summarize_with_openai(
+    article: Article,
+    api_key: str,
+    model: str,
+    max_tokens: int,
+    temperature: float,
+    endpoint: str,
+) -> Optional[str]:
+    payload = {
+        "model": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an analyst crafting concise newsletter takeaways. "
+                    "Return 2-3 sentences focused on the business implications, "
+                    "with no markup or bullet points."
+                ),
+            },
+            {
+                "role": "user",
+                "content": textwrap.dedent(
+                    f"""\
+                    Create a short takeaway for a payments industry briefing.
+
+                    Title: {article.title}
+                    Author: {article.author or 'Staff'}
+                    Published: {article.published.isoformat()}
+                    Link: {article.link}
+                    Source summary: {article.summary or 'No RSS summary provided.'}
+                    """
+                ).strip(),
+            },
+        ],
+    }
+    url = endpoint.rstrip("/") + "/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    try:
+        req = Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers)
+        with urlopen(req, timeout=30) as resp:  # nosec: B310
+            response = json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        print(f"[OpenAI] HTTP error {exc.code} for {article.title}: {exc.reason}", file=sys.stderr)
+        return None
+    except URLError as exc:
+        print(f"[OpenAI] Network error for {article.title}: {exc.reason}", file=sys.stderr)
+        return None
+    except (json.JSONDecodeError, TimeoutError) as exc:
+        print(f"[OpenAI] Failed to parse response for {article.title}: {exc}", file=sys.stderr)
+        return None
+
+    choices = response.get("choices") or []
+    if not choices:
+        print(f"[OpenAI] Empty response for {article.title}", file=sys.stderr)
+        return None
+    content = choices[0].get("message", {}).get("content")
+    if not content:
+        print(f"[OpenAI] Missing content for {article.title}", file=sys.stderr)
+        return None
+    return content.strip()
+
+
+def enhance_articles_with_openai(
+    articles: Iterable[Article],
+    api_key: Optional[str],
+    model: str,
+    max_tokens: int,
+    temperature: float,
+    endpoint: str,
+) -> None:
+    if not api_key:
+        print("[OpenAI] API key not provided; skipping enhanced summaries.", file=sys.stderr)
+        return
+    for article in articles:
+        summary = summarize_with_openai(article, api_key, model, max_tokens, temperature, endpoint)
+        if summary:
+            article.summary = summary
+
+
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -205,6 +293,38 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default="Payments Briefing",
         help="Tag to attach in the MDX frontmatter",
     )
+    parser.add_argument(
+        "--use-openai",
+        action="store_true",
+        help="Use the OpenAI API to rewrite article summaries for richer takeaways",
+    )
+    parser.add_argument(
+        "--openai-api-key",
+        default=None,
+        help="OpenAI API key (defaults to OPENAI_API_KEY environment variable)",
+    )
+    parser.add_argument(
+        "--openai-model",
+        default="gpt-4o-mini",
+        help="OpenAI model to use for summaries",
+    )
+    parser.add_argument(
+        "--openai-max-tokens",
+        type=int,
+        default=180,
+        help="Maximum tokens for each generated summary",
+    )
+    parser.add_argument(
+        "--openai-temperature",
+        type=float,
+        default=0.2,
+        help="Temperature for OpenAI generations",
+    )
+    parser.add_argument(
+        "--openai-endpoint",
+        default=DEFAULT_OPENAI_ENDPOINT,
+        help="OpenAI-compatible API base URL (defaults to https://api.openai.com/v1 or OPENAI_API_BASE)",
+    )
     return parser.parse_args(argv)
 
 
@@ -218,6 +338,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     feed_bytes = fetch_feed(args.feed_url)
     articles = parse_feed(feed_bytes, tz)
     recent = filter_recent(articles, now, args.hours)
+    if args.use_openai and recent:
+        api_key = args.openai_api_key or os.environ.get("OPENAI_API_KEY")
+        enhance_articles_with_openai(
+            recent,
+            api_key=api_key,
+            model=args.openai_model,
+            max_tokens=args.openai_max_tokens,
+            temperature=args.openai_temperature,
+            endpoint=args.openai_endpoint,
+        )
     if not recent:
         print(
             f"No articles found in the last {args.hours} hours; "

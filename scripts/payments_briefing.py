@@ -28,7 +28,30 @@ except ImportError:  # pragma: no cover
 DEFAULT_FEED_URL = "https://www.paymentsdive.com/feeds/news/"
 DEFAULT_OUTPUT_DIR = Path("content/posts")
 DEFAULT_TZ = "America/New_York"
-DEFAULT_OPENAI_ENDPOINT = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1"
+LOCAL_ENV_FILES = (Path(".env.local"), Path(".env"))
+
+
+def load_local_env(files: Iterable[Path] = LOCAL_ENV_FILES) -> None:
+    for path in files:
+        if not path.exists():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"[env] Could not read {path}: {exc}", file=sys.stderr)
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
 
 
 class _HTMLStripper(HTMLParser):
@@ -301,7 +324,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--openai-api-key",
         default=None,
-        help="OpenAI API key (defaults to OPENAI_API_KEY environment variable)",
+        help="OpenAI API key (defaults to OPENAI_API_KEY environment variable or .env.local entry)",
     )
     parser.add_argument(
         "--openai-model",
@@ -322,13 +345,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--openai-endpoint",
-        default=DEFAULT_OPENAI_ENDPOINT,
+        default=os.environ.get("OPENAI_API_BASE", DEFAULT_OPENAI_ENDPOINT),
         help="OpenAI-compatible API base URL (defaults to https://api.openai.com/v1 or OPENAI_API_BASE)",
     )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    load_local_env()
     args = parse_args(argv)
     if ZoneInfo is None:
         raise RuntimeError("Python 3.9+ with zoneinfo support is required.")

@@ -2,40 +2,63 @@ name: Payments Briefing
 
 on:
   schedule:
-    # Runs daily at 11:30 AM Eastern (16:30 UTC)
+    # Run at both UTC offsets to cover 11:30 AM Eastern during DST/standard time.
+    - cron: "30 15 * * *"
     - cron: "30 16 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   generate-and-publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Check Eastern Time window
+        id: time_check
+        run: |
+          eastern_time=$(TZ=America/New_York date '+%H:%M')
+          echo "Current Eastern Time: $eastern_time"
+          echo "eastern_time=$eastern_time" >> "$GITHUB_OUTPUT"
+          if [ "$eastern_time" = "11:30" ]; then
+            echo "run_now=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_now=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.time_check.outputs.run_now == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.time_check.outputs.run_now == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
       - name: Install dependencies
+        if: steps.time_check.outputs.run_now == 'true'
         run: npm ci
 
       - name: Generate Payments Briefing
+        if: steps.time_check.outputs.run_now == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python3 scripts/payments_briefing.py --use-openai
 
       - name: Build site
+        if: steps.time_check.outputs.run_now == 'true'
         run: npm run build
 
       - name: Stage updated posts
+        if: steps.time_check.outputs.run_now == 'true'
         run: |
           git add content/posts/payments-briefing-*.mdx
 
       - name: Detect changes
+        if: steps.time_check.outputs.run_now == 'true'
         id: git_status
         run: |
           if git diff --cached --quiet; then
@@ -45,13 +68,18 @@ jobs:
           fi
 
       - name: Commit changes
-        if: steps.git_status.outputs.changed == 'true'
+        if: steps.time_check.outputs.run_now == 'true' && steps.git_status.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "Automated payments briefing $(date -u '+%Y-%m-%d')"
 
       - name: Push changes
-        if: steps.git_status.outputs.changed == 'true'
+        if: steps.time_check.outputs.run_now == 'true' && steps.git_status.outputs.changed == 'true'
         run: |
           git push origin ${{ github.ref }}
+
+      - name: Skip run outside 11:30 AM ET
+        if: steps.time_check.outputs.run_now != 'true'
+        run: |
+          echo "Current Eastern Time ${{ steps.time_check.outputs.eastern_time }} is not 11:30; skipping workflow."

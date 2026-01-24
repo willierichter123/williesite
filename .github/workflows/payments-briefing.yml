@@ -17,10 +17,18 @@ jobs:
       - name: Check Eastern Time window
         id: time_check
         run: |
-          eastern_time=$(TZ=America/New_York date '+%H:%M')
+          eastern_hour=$(TZ=America/New_York date '+%H')
+          eastern_minute=$(TZ=America/New_York date '+%M')
+          eastern_time="${eastern_hour}:${eastern_minute}"
           echo "Current Eastern Time: $eastern_time"
           echo "eastern_time=$eastern_time" >> "$GITHUB_OUTPUT"
-          if [ "$eastern_time" = "11:30" ]; then
+          target_minutes=$((11 * 60 + 30))
+          current_minutes=$((10#$eastern_hour * 60 + 10#$eastern_minute))
+          tolerance_minutes=10
+          echo "Allowing +/- ${tolerance_minutes}-minute window around 11:30 AM ET."
+          diff=$((current_minutes - target_minutes))
+          abs_diff=${diff#-}
+          if [ "$abs_diff" -le "$tolerance_minutes" ]; then
             echo "run_now=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_now=false" >> "$GITHUB_OUTPUT"

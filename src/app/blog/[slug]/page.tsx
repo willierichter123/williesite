@@ -26,6 +26,11 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   if (!post) notFound();
 
   const content = await renderMdx(post.body);
+  const isPaymentsBriefing = post.slug.startsWith("payments-briefing");
+  const articleClass = ["prose prose-zinc mt-10 max-w-none dark:prose-invert"];
+  if (isPaymentsBriefing) {
+    articleClass.push("payments-briefing");
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-16">
@@ -38,7 +43,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         <p className="text-base text-muted-foreground">{post.description}</p>
       </div>
 
-      <article className="prose prose-zinc mt-10 max-w-none dark:prose-invert">{content}</article>
+      <article className={articleClass.join(" ")}>{content}</article>
     </div>
   );
 }

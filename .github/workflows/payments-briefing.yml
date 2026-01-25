@@ -17,6 +17,15 @@ jobs:
       - name: Check Eastern Time window
         id: time_check
         run: |
+          event_name="${{ github.event_name }}"
+          if [ "$event_name" != "schedule" ]; then
+            eastern_time=$(TZ=America/New_York date '+%H:%M')
+            echo "Manual dispatch ($event_name); bypassing time gate."
+            echo "Current Eastern Time: $eastern_time"
+            echo "eastern_time=$eastern_time" >> "$GITHUB_OUTPUT"
+            echo "run_now=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           eastern_hour=$(TZ=America/New_York date '+%H')
           eastern_minute=$(TZ=America/New_York date '+%M')
           eastern_time="${eastern_hour}:${eastern_minute}"
@@ -24,7 +33,7 @@ jobs:
           echo "eastern_time=$eastern_time" >> "$GITHUB_OUTPUT"
           target_minutes=$((11 * 60 + 30))
           current_minutes=$((10#$eastern_hour * 60 + 10#$eastern_minute))
-          tolerance_minutes=10
+          tolerance_minutes=30
           echo "Allowing +/- ${tolerance_minutes}-minute window around 11:30 AM ET."
           diff=$((current_minutes - target_minutes))
           abs_diff=${diff#-}

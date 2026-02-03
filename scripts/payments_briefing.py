@@ -129,12 +129,7 @@ def parse_feed(xml_bytes: bytes, tz: ZoneInfo) -> List[Article]:
 
 def ensure_output_path(base_dir: Path, slug: str) -> Path:
     base_dir.mkdir(parents=True, exist_ok=True)
-    candidate = base_dir / f"{slug}.mdx"
-    suffix = 1
-    while candidate.exists():
-        candidate = base_dir / f"{slug}-{suffix}.mdx"
-        suffix += 1
-    return candidate
+    return base_dir / f"{slug}.mdx"
 
 
 def format_article_markdown(article: Article, tz: ZoneInfo) -> str:
@@ -317,6 +312,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Tag to attach in the MDX frontmatter",
     )
     parser.add_argument(
+        "--overwrite-existing",
+        action="store_true",
+        help=(
+            "Overwrite the existing daily briefing if it already exists. "
+            "By default the script exits early to avoid duplicate posts."
+        ),
+    )
+    parser.add_argument(
         "--use-openai",
         action="store_true",
         help="Use the OpenAI API to rewrite article summaries for richer takeaways",
@@ -359,6 +362,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     tz = ZoneInfo(args.timezone)
     output_dir = Path(args.output_dir)
     now = datetime.now(tz)
+    slug_date = now.strftime("%Y-%m-%d")
+    destination = ensure_output_path(output_dir, f"payments-briefing-{slug_date}")
+    if destination.exists() and not args.overwrite_existing:
+        print(
+            f"Briefing for {slug_date} already exists at {destination}. "
+            "Use --overwrite-existing to replace it.",
+            file=sys.stderr,
+        )
+        return 0
+    if destination.exists() and args.overwrite_existing:
+        print(f"[overwrite] Replacing existing briefing at {destination}", file=sys.stderr)
     feed_bytes = fetch_feed(args.feed_url)
     articles = parse_feed(feed_bytes, tz)
     recent = filter_recent(articles, now, args.hours)
@@ -379,8 +393,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             file=sys.stderr,
         )
     markdown = build_markdown(recent, tz, report_date=now, tag=args.tag, lookback_hours=args.hours)
-    slug_date = now.strftime("%Y-%m-%d")
-    destination = ensure_output_path(output_dir, f"payments-briefing-{slug_date}")
     destination.write_text(markdown, encoding="utf-8")
     print(f"Wrote briefing for {now.date()} to {destination}")
     return 0

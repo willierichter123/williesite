@@ -2,8 +2,7 @@ name: Payments Briefing
 
 on:
   schedule:
-    # Run at both UTC offsets to cover 11:30 AM Eastern during DST/standard time.
-    - cron: "30 15 * * *"
+    # Run once daily at 11:30 AM Eastern (16:30 UTC).
     - cron: "30 16 * * *"
   workflow_dispatch:
 

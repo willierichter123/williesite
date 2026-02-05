@@ -373,8 +373,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     if destination.exists() and args.overwrite_existing:
         print(f"[overwrite] Replacing existing briefing at {destination}", file=sys.stderr)
-    feed_bytes = fetch_feed(args.feed_url)
-    articles = parse_feed(feed_bytes, tz)
+    try:
+        feed_bytes: Optional[bytes] = fetch_feed(args.feed_url)
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        print(f"[feed] Failed to fetch {args.feed_url}: {exc}", file=sys.stderr)
+        feed_bytes = None
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[feed] Unexpected error fetching {args.feed_url}: {exc}", file=sys.stderr)
+        feed_bytes = None
+    articles: List[Article] = []
+    if feed_bytes:
+        try:
+            articles = parse_feed(feed_bytes, tz)
+        except ET.ParseError as exc:
+            print(f"[feed] Failed to parse feed XML: {exc}", file=sys.stderr)
     recent = filter_recent(articles, now, args.hours)
     if args.use_openai and recent:
         api_key = args.openai_api_key or os.environ.get("OPENAI_API_KEY")
